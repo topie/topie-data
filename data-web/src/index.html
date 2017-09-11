@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>槐房后台管理系统平台</title>
+    <title>TOPIE数据后台管理系统平台</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <!-- jQuery UI -->
@@ -180,18 +180,6 @@
 <script src="js/sys/export-task.js"></script>
 <script src="js/sys/notice.js"></script>
 
-
-<script src="js/core/yellow-page.js"></script>
-<script src="js/core/house-node.js"></script>
-<script src="js/core/house-info.js"></script>
-<script src="js/core/person-info.js"></script>
-<script src="js/core/company-info.js"></script>
-<script src="js/core/asset-info.js"></script>
-
-<script src="js/core/party-members-info.js"></script>
-<script src="js/core/party-members-business.js"></script>
-<script src="js/core/party-members-activity.js"></script>
-
 <script type="text/javascript">
     bootbox.setLocale("zh_CN");
     $.fn.modal.Constructor.prototype.enforceFocus = function () {
@@ -205,7 +193,7 @@
                 dataType: "json",
                 success: function (result) {
                     if (result.code === 200) {
-                        $.cookie('huaifang_token', null);
+                        $.cookie('data_token', null);
                         window.location.href = App.href + "/login.html";
                     } else {
                         alert(result.message);

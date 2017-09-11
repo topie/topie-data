@@ -3,12 +3,12 @@
  */
 ;
 (function ($, window, document, undefined) {
-    var vkey = "huaifang_" + new Date().getTime() + "_" + Math.floor(Math.random() * 10);
+    var vkey = "data_" + new Date().getTime() + "_" + Math.floor(Math.random() * 10);
 
     function initLogin() {
         $("#captcha_img").attr("src", App.href + "/api/noneAuth/captcha?vkey=" + vkey);
         $("#captcha_a").on("click", function () {
-            vkey = "huaifang_" + new Date().getTime() + "_" + Math.floor(Math.random() * 10);
+            vkey = "data_" + new Date().getTime() + "_" + Math.floor(Math.random() * 10);
             $("#captcha_img").attr("src", App.href + "/api/noneAuth/captcha?vkey=" + vkey + "&s=" + new Date().getTime());
         });
         $('#username,#password,#vcode').bind('keypress', function (event) {
@@ -63,7 +63,7 @@
             data: fields,
             success: function (result) {
                 if (result.code === 200) {
-                    $.cookie('huaifang_token', result.token, {expires: 7});
+                    $.cookie('data_token', result.token, {expires: 7});
                     window.location.href = App.href;
                 } else {
                     alertValidate(result.message);
