@@ -98,8 +98,8 @@ public class TokenController {
     }
 
     @RequestMapping(value = "/login", method = RequestMethod.POST)
-    public ResponseEntity<?> login(HttpServletRequest request,
-            @RequestBody AuthenticationRequest authenticationRequest) throws AuthenticationException {
+    public ResponseEntity<?> login(HttpServletRequest request, @RequestBody AuthenticationRequest authenticationRequest)
+            throws AuthenticationException {
         UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(
                 authenticationRequest.getUsername(), authenticationRequest.getPassword());
         usernamePasswordAuthenticationToken.setDetails(new HttpAuthenticationDetails());

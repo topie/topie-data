@@ -280,6 +280,7 @@
                 this.$element.attr("id", id);
             }
             this._elementId = id;
+
             this._options = options;
 
             this.$searchForm = undefined;
@@ -297,8 +298,8 @@
             this._type = options.type == undefined ? "GET" : options.type;
             this._beforeSend = options.beforeSend;
             if (options.data != undefined) {
-                if (options.data.data != undefined
-                    || options.data.total != undefined) {
+                if (options.data.data == undefined
+                    || options.data.total == undefined) {
                     console.error("data格式不正确，必须包含data和total");
                     return;
                 }
@@ -373,57 +374,61 @@
         },
         // 异步加载数据
         _loadData: function () {
-            var that = this;
-            var parameters = "";
-            if (that._url.indexOf("?") != -1) {
-                parameters = "&";
-            } else {
-                parameters = "?";
-            }
-            parameters += "pageNum=" + this._pageNum;
-            parameters += "&pageSize=" + this._pageSize;
-            parameters += "&sort_="
-                + (this._sort == undefined ? "" : this._sort);
-            this.$element.block(
-                {
-                    message: null,
-                    css: {
-                        backgroundColor: '#ddd',
-                        color: '#ddd'
+            if (this._url != undefined) {
+                var that = this;
+                var parameters = "";
+                if (that._url.indexOf("?") != -1) {
+                    parameters = "&";
+                } else {
+                    parameters = "?";
+                }
+                parameters += "pageNum=" + this._pageNum;
+                parameters += "&pageSize=" + this._pageSize;
+                parameters += "&sort_="
+                    + (this._sort == undefined ? "" : this._sort);
+                this.$element.block(
+                    {
+                        message: null,
+                        css: {
+                            backgroundColor: '#ddd',
+                            color: '#ddd'
+                        }
+                    });
+                $.ajax({
+                    type: that._type,
+                    dataType: "json",
+                    data: that.$searchForm == undefined ? {} : that.$searchForm
+                        .serialize(),
+                    beforeSend: function (request) {
+                        if (that._beforeSend != undefined) {
+                            that._beforeSend(request);
+                        }
+                    },
+                    url: that._url + (parameters == undefined ? "" : parameters),
+                    success: function (data) {
+                        if (data.code === 200) {
+                            that.$element.unblock();
+                            that._setData(data.data);
+                            that._init();
+                        } else if (data.code === 401) {
+                            that.$element.unblock();
+                            that._alert(data.message + ";请重新登录！", undefined, undefined, App.redirectLogin);
+                        } else if (data.code === 403) {
+                            that.$element.unblock();
+                            that._alert(data.message);
+                        } else {
+                            that.$element.unblock();
+                            that._alert(data.message);
+                        }
+                    },
+                    error: function (jqXHR, textStatus, errorMsg) {
+                        that.$element.unblock();
+                        console.error("请求异常！");
                     }
                 });
-            $.ajax({
-                type: that._type,
-                dataType: "json",
-                data: that.$searchForm == undefined ? {} : that.$searchForm
-                    .serialize(),
-                beforeSend: function (request) {
-                    if (that._beforeSend != undefined) {
-                        that._beforeSend(request);
-                    }
-                },
-                url: that._url + (parameters == undefined ? "" : parameters),
-                success: function (data) {
-                    if (data.code === 200) {
-                        that.$element.unblock();
-                        that._setData(data.data);
-                        that._init();
-                    } else if (data.code === 401) {
-                        that.$element.unblock();
-                        that._alert(data.message + ";请重新登录！", undefined, undefined, App.redirectLogin);
-                    } else if (data.code === 403) {
-                        that.$element.unblock();
-                        that._alert(data.message);
-                    } else {
-                        that.$element.unblock();
-                        that._alert(data.message);
-                    }
-                },
-                error: function (jqXHR, textStatus, errorMsg) {
-                    that.$element.unblock();
-                    console.error("请求异常！");
-                }
-            });
+            } else {
+                this._init();
+            }
         },
         _setData: function (data) {
             this._data = data;
@@ -856,6 +861,7 @@
                 });
             });
             searchFormRow.find('.form-actions').append(searchbtn);
+            this.$searchbtn = searchbtn;
             searchbtn.after("&nbsp;");
             if (buttons != undefined && buttons.length > 0) {
                 $.each(buttons, function (index, button) {
@@ -899,9 +905,11 @@
             }
         },
         refreshSearchItem: function (name, option) {
+            var that = this;
             var itemDiv = this._searchEles[name];
             itemDiv.find(".form-group").empty();
-            var item = option || this._searchElesOption[name];
+            var item = $.extend(true, {}, that._searchElesOption[name], option);
+            that._searchElesOption[name] = item;
             if (item.label != undefined) {
                 var label = $.tmpl(
                     Grid.statics.labelTmpl, {
@@ -1150,6 +1158,19 @@
                 ele = item.eleHandler();
                 itemDiv.find(".form-group").append(ele);
             }
+            ele.off("change");
+            ele.on("change", function () {
+                var name = $(this).attr("name");
+                var text = $(this).find("option:selected").text();
+                var value = $(this).val();
+                if (that._searchElesOption[name].change !== undefined) {
+                    that._searchElesOption[name].change(text, value, that);
+                }
+                if (that._options.changeLoad) {
+                    that.$searchbtn.trigger("click");
+                }
+            });
+
         },
         _renderGridWrapper: function () {
             var that = this;
@@ -1162,6 +1183,7 @@
                 '<a role="table" class="btn btn-large btn-info" title="表格" ><i class="fa fa-table"></i></a>' +
                 '<a role="card" class="btn btn-large btn-info" title="卡片"><i class="fa fa-th"></i></a>' +
                 '<a role="list" class="btn btn-large btn-info" title="列表"><i class="fa fa-list"></i></a>' +
+                '<a role="timeline" class="btn btn-large btn-info" title="时序"><i class="fa fa-clock-o"></i></a>' +
                 '<a role="chart-bar" class="btn btn-large btn-info" title="柱状图"><i class="fa fa-bar-chart-o"></i></a>' +
                 '<a role="chart-line" class="btn btn-large btn-info" title="折线图"><i class="fa fa-line-chart"></i></a>' +
                 '<a role="chart-pie" class="btn btn-large btn-info" title="饼图"><i class="fa fa-pie-chart"></i></a>' +
@@ -1205,6 +1227,9 @@
                         break;
                     case "html":
                         this._renderHtml();
+                        break;
+                    case "timeline":
+                        this._renderTimeline();
                         break;
                     default:
                         this._renderCard();
@@ -1587,7 +1612,7 @@
                         var button = $('<button type="button" class="btn ' + colum.cls + '">' + text + '</button>');
                         if (colum.handle != undefined) {
                             button.click(function (e) {
-                                colum.handle(num, current_data);
+                                colum.handle(num, current_data, that);
                                 e.stopPropagation();
                             });
                         }
@@ -1690,7 +1715,7 @@
                                 var button = $('<button type="button" class="btn btn-update btn-add-card ' + colum.cls + '">' + text + '</button>');
                                 if (colum.handle != undefined) {
                                     button.click(function (e) {
-                                        colum.handle(num, current_data);
+                                        colum.handle(num, current_data, that);
                                         e.stopPropagation();
                                     });
                                 }
@@ -1698,6 +1723,119 @@
                             });
                         }
                         row.append(ele);
+                    });
+                }
+            }
+            this.$gridWrapper.append(cardRow);
+        },
+        _renderTimeline: function () {
+            var that = this;
+            var head_array = [];
+            var head_index = [];
+            var format_array = [];
+            $.each(that._columns, function (index, column) {
+                head_array.push(column.field);
+                head_index.push(index);
+                format_array.push(column.format);
+            });
+            var cardRow = $.tmpl(Grid.statics.cardRowTmpl, {});
+            if (that._grids != undefined && that._grids != null) {
+                if (that._grids.length == 0) {
+                    var emptyRow = $('<div class="row"></div>');
+                    emptyRow.append('<div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"><div style="text-align: center;" class="thumbnail">暂无数据!</div></div>');
+                    cardRow.find("div[role=content]").append(emptyRow);
+                } else {
+                    var colDiv = $('<div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"></div>');
+                    cardRow.append(colDiv);
+                    var ul = $('<ul class="timeline"></ul>');
+                    cardRow.append(ul);
+                    $.each(that._grids, function (i, grid) {
+                        var num = (that._pageNum - 1) * that._pageSize + i + 1;
+                        var ele = $('<li>' +
+                            '<div class="timeline-badge">' +
+                            //'<i class="fa fa-check"></i>' +
+                            '</div>' +
+                            '<div class="timeline-panel">' +
+                            '    <div class="timeline-heading">' +
+                            '        <h4 class="timeline-title" role="hd"></h4>' +
+                            '    </div>' +
+                            '    <div class="timeline-body" role="data">' +
+                            '    </div>' +
+                            '</div>' +
+                            '</li>');
+                        if (num % 2 == 0) {
+                            ele.addClass("timeline-inverted")
+                        }
+                        $.each(that._columns, function (j, column) {
+                            var title = column.title;
+                            var field = column.field;
+                            var html = grid[field];
+                            if (column.format != undefined) {
+                                html = column.format(num, grid);
+                            }
+                            if (that._headField == undefined) {
+                                ele.find("h4[role=hd]").text(grid[that._idField]);
+                            }
+
+                            if (that._options.timeField != undefined && column.field == that._options.timeField) {
+                                var time = $('<p><small class="text-muted" role="time"><i class="fa fa-clock-o"></i> </small></p>')
+                                time.find("small[role=time]").append(grid[that._options.timeField]);
+                                ele.find(".timeline-heading").append(time);
+                            }
+
+                            if (column.field == that._headField) {
+                                ele.find("h4[role=hd]").text(html);
+                            }
+
+                            if (column.check === true) {
+                                if (column.checkFormat != undefined) {
+                                    if (column.checkFormat(num, grid)) {
+                                        ele.find('.timeline-badge').append('<i class="fa fa-check"></i>');
+                                    }
+                                }
+                            }
+
+                            var p = $('<div class="row"><div class="col-lg-4"><strong>' + title + '</strong></div><div class="col-lg-8"><p style="font-size: 12px;word-break: break-all;word-wrap: break-word;" class="lead">' + html + '</p></div></div>');
+                            ele.find("div[role=data]").append(p);
+                            if (column.dataClick != undefined) {
+                                p.find('p').css("text-decoration", "underline");
+                                p.find('p').css("cursor", "pointer");
+                                p.find('p').css("color", "red");
+                                p.find('p').on("click", function () {
+                                    column.dataClick(num, grid);
+                                })
+                            }
+                        });
+                        if (that._actionColumns != undefined) {
+                            ele.find('.timeline-panel').append('<div class="timeline-footer" role="btn-g"></div>');
+                            var _index = i;
+                            var current_data = grid;
+                            $.each(that._actionColumns, function (k, colum) {
+                                var visible = true;
+                                if (colum.visible != undefined) {
+                                    visible = colum.visible(_index, current_data);
+                                }
+                                if (visible == false) {
+                                    return;
+                                }
+                                var text = colum.text;
+                                if (colum.textHandle != undefined) {
+                                    text = colum.textHandle(num, current_data);
+                                }
+                                if (colum.clsHandle != undefined) {
+                                    colum.cls = colum.clsHandle(num, current_data);
+                                }
+                                var button = $('<button type="button" class="btn btn-update btn-add-card ' + colum.cls + '">' + text + '</button>');
+                                if (colum.handle != undefined) {
+                                    button.click(function (e) {
+                                        colum.handle(num, current_data, that);
+                                        e.stopPropagation();
+                                    });
+                                }
+                                ele.find("div[role=btn-g]").append(button);
+                            });
+                        }
+                        ul.append(ele);
                     });
                 }
             }
@@ -1864,6 +2002,13 @@
                             column.dataClick(num, grid);
                         })
                     }
+                    if (column.tooltipHandle != undefined) {
+                        var icon = $('<i style="color: red;font-size: 18px;margin-right: 4px;" class="fa fa-question-circle-o" aria-hidden="true"></i>');
+                        icon.attr("title", column.tooltipHandle(num, grid));
+                        icon.attr("data-toggle", "tooltip");
+                        icon.attr("data-placement", "right");
+                        td.prepend(icon);
+                    }
                 });
                 if (that._actionColumns != undefined) {
                     var cltd = $.tmpl(tdTmpl, {});
@@ -1891,7 +2036,7 @@
                         });
                         if (colum.handle != undefined) {
                             button.click(function (e) {
-                                colum.handle(num, current_data);
+                                colum.handle(num, current_data, that);
                                 e.stopPropagation();
                             });
                         }
@@ -2186,6 +2331,7 @@
             });
             this._uniform();
             this._doSelect2();
+            this.$gridWrapper.find("i[data-toggle='tooltip']").tooltip();
         },
         // 执行回调
         _doAfterInit: function () {

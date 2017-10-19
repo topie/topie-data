@@ -12,8 +12,13 @@
     }
     var isArray = function (object) {
         return object && typeof object === 'object' &&
-            Array == object.constructor;
-    }
+            Array === object.constructor;
+    };
+    var isMap = function (object) {
+        return object && typeof object === 'object' &&
+            Array !== object.constructor;
+    };
+
     var getLowCaseType = function (string) {
         var postfix = string.substring(string.lastIndexOf("."), string.length);
         return postfix.toLowerCase();
@@ -81,7 +86,7 @@
     };
     Form.defaults = {
         method: "post",
-        labelInline: true,
+        labelInline: false,
         rowEleNum: 1,
         ajaxSubmit: true,
         showSubmit: true,
@@ -95,10 +100,10 @@
         formTmpl: '<form id="${id_}" name="${name_}" action="${action_}" method="${method_}" enctype="multipart/form-data" class="${cls_}"></form>',
         formBodyTmpl: '<div></div>',
         formActionTmpl: '<div class="form-actions" style="padding-bottom:20px;text-align:${align_};"></div>',
-        rowTmpl: '<div data-row=${row_} class="row"></div>',
+        rowTmpl: '<div data-row=${row_} drow=true class="row"></div>',
         eleTmpl: '<div class="col-md-${span_}"><div class="form-group"></div></div>',
-        sectionTmpl: '<div class="col-md-12"><h3 class="form-section">${title_}</h3></div>',
-        labelTmpl: '<label style="text-align: left" class="control-label ${cls_}">${label_}</label>',
+        sectionTmpl: '<div class="col-md-12"><h3 class="form-section">${title_}</h3><hr></div>',
+        labelTmpl: '<label style="text-align: left;font-size: 18px;" class="control-label ${cls_}">${label_}</label>',
         blockSpanTmpl: '<span class="help-block">${help_}</span>',
         buttonTmpl: '<button type="${type_}" class="btn ${cls_}" ${attribute_}>${text_}</button>',
         alertTmpl: '<div class="alert alert-${type_} alert-dismissable" role="alert">'
@@ -135,10 +140,21 @@
                 },
                 success: function (data) {
                     if (data.code === 200) {
-                        this._data = data.data;
-                        $.each(this._data, function (i, item) {
-                            that._loadValue(i, item);
-                        });
+                        if (isArray(data.data)) {
+                            that._data = {};
+                            $.each(data.data, function (i, d) {
+                                $.each(d, function (ii, id) {
+                                    that._loadValue(ii, id);
+                                });
+                            });
+                        } else {
+                            if (data.data != null) {
+                                $.each(data.data, function (i, item) {
+                                    that._loadValue(i, item);
+                                });
+                            }
+                            that._data = data.data;
+                        }
                         if (callback !== undefined) {
                             callback();
                         }
@@ -158,6 +174,7 @@
             this._alert(alertText, "danger", 5);
         },
         _alert: function (alertText, type, seconds) {
+            var that = this;
             if (type === undefined) {
                 type = "danger";
             }
@@ -168,9 +185,9 @@
                 "type_": type,
                 "alert_": alertText
             });
-            this.$element.prepend(alertDiv);
+            this.$element.append(alertDiv);
             alertDiv.delay(seconds * 1000).fadeOut();
-            App.scrollTo(alertDiv, -200);
+            bootbox.alert(alertText);
         },
         _setVariable: function (element, options) {
             this.$element = $(element);
@@ -336,6 +353,13 @@
                 "label_": item.label === undefined ? "" : item.label
             });
             wrapper.find(".form-group").append(label);
+            if (item.tips !== undefined) {
+                var icon = $('<i style="color: red;font-size: 18px;margin-right: 4px;" class="fa fa-question-circle-o" aria-hidden="true"></i>');
+                icon.attr("title", item.tips);
+                icon.attr("data-toggle", "tooltip");
+                icon.attr("data-placement", "right");
+                label.append(icon);
+            }
             var help;
             if (item.detail !== undefined) {
                 help = $.tmpl(Form.statics.blockSpanTmpl, {
@@ -446,7 +470,7 @@
                     });
                     if (button.handle !== undefined) {
                         btn.on("click", function () {
-                            button.handle();
+                            button.handle(that);
                         });
                     }
                     formAction.append(btn);
@@ -456,7 +480,7 @@
         },
         _formEles: {
             'html': function (data, form) {
-                var htmlWrapper = '<div id="${id_}" name="${name_}" ${attribute_} ></div>';
+                var htmlWrapper = '<div drole="main" id="${id_}" name="${name_}" ${attribute_} ></div>';
                 var ele = $.tmpl(htmlWrapper, {
                     "id_": (data.id === undefined ? data.name : data.id),
                     "name_": data.name,
@@ -475,7 +499,7 @@
                 return ele;
             },
             'list': function (data, form) {
-                var wrapper = '<div role="list" class="row" id="${id_}" name="${name_}" ${attribute_} >' +
+                var wrapper = '<div drole="main" role="list" class="row" id="${id_}" name="${name_}" ${attribute_} >' +
                     '<div role="ele" class="col-lg-12"></div>' +
                     '<div role="action" class="col-lg-12 btn-group"></div>' +
                     '</div>';
@@ -486,25 +510,39 @@
                         : data.attribute)
                 });
                 var addBtn = $('<button class="btn btn-info" type="button">添加</button>');
-                ele.find('[role=action]').append(addBtn);
+                ele.children('[role=action]').append(addBtn);
                 addBtn.on("click", function () {
                     var itemWrapper = $('<div class="row">' +
-                        '<div role="s-ele" class="col-lg-12 form-group input-group"><span role="s-action" class="input-group-btn"></span></div>' +
+                        '<div role="s-ele" class="col-md-12 form-group input-group">' +
+                        '</div>' +
                         '</div>');
-                    var item = form._formEles[data.item.type](data.item, form);
-                    itemWrapper.find('[role=s-ele]').prepend(item);
-                    var deleteBtn = $('<button class="btn btn-danger" type="button"><i class="fa fa-times"></i></button>');
-                    itemWrapper.find('[role=s-action]').append(deleteBtn);
-                    deleteBtn.on("click", function () {
-                        itemWrapper.remove();
-                    });
-                    ele.find('[role=ele]').append(itemWrapper);
-                    form._uniform();
+                    if (data.items != undefined) {
+                        $.each(data.items, function (j, jd) {
+                            var item = form._formEles[jd.type](jd, form);
+                            var iWrapper;
+                            if (jd.label != undefined) {
+                                iWrapper = $('<div class="form-group"><label class="control-label col-md-offset-1 col-md-2">' + jd.label + '</label><div role="i-ele" class="col-md-9"></div></div>');
+                            } else {
+                                iWrapper = $('<div class="form-group"><div role="i-ele" class="col-md-offset-1 col-md-11"></div></div>');
+                            }
+                            iWrapper.children('[role=i-ele]').append(item);
+                            itemWrapper.children('[role=s-ele]').append(iWrapper);
+                        });
+                        itemWrapper.children('[role=s-ele]').append($('<span role="s-action" style="vertical-align: top;" class="input-group-btn"></span>'));
+                        var deleteBtn = $('<button class="btn btn-danger" type="button"><i class="fa fa-times"></i></button>');
+                        itemWrapper.children().children('[role=s-action]').append(deleteBtn);
+                        deleteBtn.on("click", function () {
+                            itemWrapper.remove();
+                        });
+                        ele.children('[role=ele]').append(itemWrapper);
+                        form._uniform();
+                    }
+
                 });
                 var cleanBtn = $('<button class="btn btn-danger" type="button">清除</button>');
-                ele.find('[role=action]').append(cleanBtn);
+                ele.children('[role=action]').append(cleanBtn);
                 cleanBtn.on("click", function () {
-                    ele.find('[role=ele]').empty();
+                    ele.children('[role=ele]').empty();
                 });
                 ele.data("data", data);
                 return ele;
@@ -517,6 +555,8 @@
                     "style_": (data.style === undefined ? ""
                         : data.style)
                 });
+                if (data.html != undefined)
+                    ele.html(data.html);
                 ele.data("format", data.format);
                 return ele;
             },
@@ -528,6 +568,8 @@
                     "attribute_": (data.attribute === undefined ? ""
                         : data.attribute)
                 });
+                if (data.value != undefined)
+                    ele.val(data.value);
                 return ele;
             },
             'text': function (data, form) {
@@ -546,6 +588,8 @@
                     "attribute_": (data.attribute === undefined ? ""
                         : data.attribute)
                 });
+                if (data.value != undefined)
+                    ele.val(data.value);
                 return ele;
             },
             'password': function (data, form) {
@@ -577,6 +621,8 @@
                     "attribute_": (data.attribute === undefined ? ""
                         : data.attribute)
                 });
+                if (data.mode !== undefined)
+                    ele.attr("mode", data.mode);
                 return ele;
             },
             'select': function (data, form) {
@@ -706,7 +752,7 @@
                 if (data.items !== undefined && data.items.length > 0) {
                     $.each(data.items, function (i, radio) {
                         var rd = $.tmpl(radioTmpl, {
-                            "inline_": data.inline ? inlineCls : "",
+                            "inline_": data.inline ? "" : inlineCls,
                             "name_": data.name,
                             "value_": radio.value,
                             "text_": radio.text,
@@ -904,7 +950,8 @@
                 var tableTmpl = '<table id="file_table_${id_}" name="'
                     + data.name + '" role="presentation" class="table table-striped clearfix"><tbody class="files"></tbody></table>';
                 var table = $.tmpl(tableTmpl, {
-                    "id_": (data.id === undefined ? data.name : data.id)
+                    "id_": (data.id === undefined ? data.name : data.id),
+                    "name_": data.name
                 });
                 table.data("data", data);
                 var eleTmpl = '<div id="files_div_${id_}" name="files_div_${name_}"></div>';
@@ -931,6 +978,10 @@
                     "id_": (data.id === undefined ? data.name : data.id),
                     "name_": data.name
                 });
+                if (data.readonly == 'readonly') {
+                    ele.find(".btn").hide();
+                    ele.find("span").hide();
+                }
                 if (data.uploadUrl === undefined) {
                     data.uploadUrl = App.href + "/api/common/uploadImage";
                 }
@@ -1026,16 +1077,18 @@
                                 }
                             });
                     };
-                    if (data.autoUpload) {
-                        ele.find('[role="file"]').on("change", function () {
-                            uploadFile();
-                        });
-                    } else {
-                        var upload = $('<a href="javascript:;" role="upload" data-dismiss="fileinput" class="btn btn-primary fileinput-exists">上传 </a>');
-                        ele.find("[role='imageDiv']").append(upload);
-                        upload.on("click", function () {
-                            uploadFile();
-                        });
+                    if (data.readonly !== 'readonly') {
+                        if (data.autoUpload) {
+                            ele.find('[role="file"]').on("change", function () {
+                                uploadFile();
+                            });
+                        } else {
+                            var upload = $('<a href="javascript:;" role="upload" data-dismiss="fileinput" class="btn btn-primary fileinput-exists">上传 </a>');
+                            ele.find("[role='imageDiv']").append(upload);
+                            upload.on("click", function () {
+                                uploadFile();
+                            });
+                        }
                     }
                 }
                 return ele;
@@ -1079,7 +1132,9 @@
                         autoParam: data.autoParam
                     },
                     callback: {
-                        beforeCheck: beforeCheck,
+                        beforeCheck: function (treeId, treeNode) {
+                            beforeCheck(treeId, treeNode, form);
+                        },
                         onCheck: function (e, treeId, treeNode) {
                             var zTree = $.fn.zTree.getZTreeObj(treeId);
                             var nodes = zTree.getCheckedNodes(true);
@@ -1143,6 +1198,10 @@
             this._initMultiFileUpload();
             this._initHtmlHandle();
             this._initCodeMirror();
+            this._initTooltip();
+        },
+        _initTooltip: function () {
+            this.$form.find("i[data-toggle='tooltip']").tooltip();
         },
         _uniform: function () {
             var that = this;
@@ -1218,21 +1277,25 @@
                 $('textarea[code=true]').each(function () {
                     var area = this;
                     var t = document.getElementById($(this).attr("id"));
+                    var mode = "text/typescript";
+                    if ($(this).attr("mode") !== undefined)
+                        mode = $(this).attr("mode");
                     var e = CodeMirror.fromTextArea(t, {
                         lineNumbers: true,
                         matchBrackets: true,
-                        mode: "text/typescript"
+                        mode: mode
                     });
                     e.on("change", function (cm) {
                         $(area).val(cm.getValue());
                     });
+                    $(this).parent("div[formele=textarea]").css("border", "1px solid");
                 });
             }, that), 500);
         },
         _initMultiFileUpload: function () {
             var template = '<tr class="template-upload fade in">'
                 + '<td style="width: 20%; border-bottom: 1px solid #ddd;border-left: 1px solid #ddd;">'
-                + '<span class="preview"><img alt="${alt_}" width="99%" height="99%"></span>'
+                + '<span class="preview"><img alt="${alt_}" style="width: 32px;height: 32px;"></span>'
                 + '</td>'
                 + '<td style="width: 50%;vertical-align: middle;border-bottom: 1px solid #ddd;">'
                 + '<p class="name">${fileName_}</p>'
@@ -1346,27 +1409,55 @@
             var that = this;
             var data = $(div).data("data");
             var ele = $(div);
-            var value_arr = isArray(values) ? values : values.split(',');
-            $.each(value_arr, function (i, d) {
+            console.info(values);
+            var value_arr = values === undefined ? "" : (isArray(values) ? values : values.split(','));
+            $.each(value_arr, function (i, id) {
                 var itemWrapper = $('<div class="row">' +
-                    '<div role="s-ele" class="col-lg-12 form-group input-group"><span role="s-action" class="input-group-btn"></span></div>' +
+                    '<div role="s-ele" class="col-lg-12 form-group input-group"></div>' +
                     '</div>');
-                var item = that._formEles[data.item.type](data.item, form);
-                that._loadValue(data.item.name, d, item);
-                itemWrapper.find('[role=s-ele]').prepend(item);
-                var deleteBtn = $('<button class="btn btn-danger" type="button"><i class="fa fa-times"></i></button>');
-                itemWrapper.find('[role=s-action]').append(deleteBtn);
-                deleteBtn.on("click", function () {
-                    itemWrapper.remove();
-                });
-                ele.find('[role=ele]').append(itemWrapper);
+                if (data.items != undefined) {
+                    if (data.items.length == 1) {
+                        var it = data.items[0];
+                        var item = that._formEles[it.type](it, that);
+                        that._loadValue(it.name, id, item);
+                        var iWrapper;
+                        if (it.label != undefined) {
+                            iWrapper = $('<div class="form-group"><label class="control-label col-md-2">' + it.label + '</label><div role="i-ele" class="col-md-8"></div></div>');
+                        } else {
+                            iWrapper = $('<div class="form-group"><div role="i-ele" class="col-md-12"></div></div>');
+                        }
+                        iWrapper.find('[role=i-ele]').append(item);
+                        itemWrapper.find('[role=s-ele]').append(iWrapper);
+                    } else {
+                        $.each(data.items, function (j, jd) {
+                            var item = that._formEles[jd.type](jd, that);
+                            that._loadValue(jd.name, id[jd.name], item);
+                            var iWrapper;
+                            if (jd.label != undefined) {
+                                iWrapper = $('<div class="form-group"><label class="control-label col-md-offset-1 col-md-2">' + jd.label + '</label><div role="i-ele" class="col-md-9"></div></div>');
+                            } else {
+                                iWrapper = $('<div class="form-group"><div role="i-ele" class="col-md-offset-1 col-md-11"></div></div>');
+                            }
+                            iWrapper.find('[role=i-ele]').append(item);
+                            itemWrapper.find('[role=s-ele]').append(iWrapper);
+                        });
+                    }
+                    itemWrapper.find('[role=s-ele]').append($('<span role="s-action" style="vertical-align: top;" class="input-group-btn"></span>'));
+                    var deleteBtn = $('<button class="btn btn-danger" type="button"><i class="fa fa-times"></i></button>');
+                    itemWrapper.find('[role=s-action]').append(deleteBtn);
+                    deleteBtn.on("click", function () {
+                        itemWrapper.remove();
+                    });
+                    ele.find('[role=ele]').append(itemWrapper);
+                    that._uniform();
+                }
             });
         },
         _renderMultipleFiles: function (table, fieldName, fileIds) {
             var elementData = $(table).data("data");
             var template = '<tr class="template-upload fade in">'
                 + '<td style="width: 20%;">'
-                + '<span class="preview"><img alt="${alt_}" width="46" height="40"></span>'
+                + '<span class="preview"><img alt="${alt_}" width="32" height="32"></span>'
                 + '</td>'
                 + '<td style="width: 50%;vertical-align: middle;border-bottom: 1px solid #ddd;">'
                 + '<p class="name">${fileName_}</p>'
@@ -1539,149 +1630,155 @@
             }
         },
         _loadValue: function (name, value, element) {
-            var ele = element || this.$form.find("[name='" + name + "']");
-            if (ele.is('input[type="text"]')) {
-                if (ele.attr("data-type") == "tree-input") {
-                    if ($.isArray(value)) {
-                        value = value.toString();
-                    }
-                    ele.attr("value", value);
-                    var tree = $.fn.zTree.getZTreeObj("tree_" + ele.attr("id"));
-                    if (tree !== undefined) {
-                        tree.refresh();
-                        tree.reAsyncChildNodes(null, "refresh");
-                    }
-                    ele.trigger("change");
-                } else if (ele.attr("role") == "image-input") {
-                    if (value !== undefined && value != '') {
-                        ele.attr("value", value);
-                        preview = ele.parent().parent().parent().find(
-                            "[role='preview']");
-                        var $img = $('<img>');
-                        $img[0].src = value;
-                        if (preview.css('max-height') != 'none')
-                            $img.css('max-height', parseInt(preview
-                                    .css('max-height'), 10)
-                                - parseInt(preview.css('padding-top'), 10)
-                                - parseInt(preview.css('padding-bottom'), 10)
-                                - parseInt(preview.css('border-top'), 10)
-                                - parseInt(preview.css('border-bottom'), 10))
-                        preview.html($img);
-                        preview.parent().removeClass("fileinput-new").addClass(
-                            "fileinput-exists");
-                    }
-                } else if (ele.attr("role") == "file-input") {
-                    if (value != '') {
-                        ele.attr("value", value);
-                        ele.parent().parent().parent().removeClass("fileinput-new")
-                            .addClass("fileinput-exists");
-                        ele.parent().parent().parent().find(
-                            "span.fileinput-filename ").text(
-                            value.substring(value.lastIndexOf("/") + 1));
-                    }
-                } else if (ele.is('table')) {
-                    this._renderMultipleFiles(ele, name, value);
-                } else {
-                    ele.val(value);
+            if (isMap(value)) {
+                for (var k in value) {
+                    this._loadValue(name + "." + k, value[k], element)
                 }
-            } else if (ele.is('input[type="radio"]')) {
-                this.$form.find(
-                    "input[type='radio'][name='" + name + "'][value='"
-                    + value + "']").attr("checked", true);
-            } else if (ele.is('input[type="checkbox"]')) {
-                if (value != null) {
-                    var values = value.split(",");
-                    for (var i in values) {
-                        this.$form.find(
-                            "input[type='checkbox'][name='" + name
-                            + "'][value='" + values[i] + "']")
-                            .attr("checked", true);
-                    }
-                }
-            } else if (ele.is('input[type="hidden"]')) {
-                if (value != null && value != "") {
+            } else {
+                var ele = element || this.$form.find("[name='" + name + "']");
+                if (ele.is('input[type="text"]')) {
                     if (ele.attr("data-type") == "tree-input") {
-                        if ($.isArray(value)) {
+                        if (isArray(values)) {
                             value = value.toString();
                         }
-                        ele.val(value);
-                        var tree = $.fn.zTree.getZTreeObj("tree_"
-                            + ele.attr("id"));
+                        ele.attr("value", value);
+                        var tree = $.fn.zTree.getZTreeObj("tree_" + ele.attr("id"));
                         if (tree !== undefined) {
                             tree.refresh();
                             tree.reAsyncChildNodes(null, "refresh");
                         }
+                        ele.trigger("change");
                     } else if (ele.attr("role") == "image-input") {
                         if (value !== undefined && value != '') {
-                            ele.val(value);
-                            var preview = ele.parent().parent().parent().find(
+                            ele.attr("value", value);
+                            preview = ele.parent().parent().parent().find(
                                 "[role='preview']");
                             var $img = $('<img>');
                             $img[0].src = value;
                             if (preview.css('max-height') != 'none')
-                                $img.css('max-height',
-                                    parseInt(preview.css('max-height'), 10)
-                                    - parseInt(preview
-                                        .css('padding-top'), 10)
-                                    - parseInt(preview
-                                        .css('padding-bottom'), 10)
-                                    - parseInt(preview
-                                        .css('border-top'), 10)
-                                    - parseInt(preview
-                                        .css('border-bottom'), 10))
+                                $img.css('max-height', parseInt(preview
+                                        .css('max-height'), 10)
+                                    - parseInt(preview.css('padding-top'), 10)
+                                    - parseInt(preview.css('padding-bottom'), 10)
+                                    - parseInt(preview.css('border-top'), 10)
+                                    - parseInt(preview.css('border-bottom'), 10))
                             preview.html($img);
                             preview.parent().removeClass("fileinput-new").addClass(
                                 "fileinput-exists");
                         }
                     } else if (ele.attr("role") == "file-input") {
-                        ele.val(value);
-                        ele.parent().parent().parent().removeClass(
-                            "fileinput-new").addClass("fileinput-exists");
-                        ele.parent().parent().parent().find(
-                            "span.fileinput-filename ").text(
-                            value.substring(value.lastIndexOf("/") + 1));
+                        if (value != '') {
+                            ele.attr("value", value);
+                            ele.parent().parent().parent().removeClass("fileinput-new")
+                                .addClass("fileinput-exists");
+                            ele.parent().parent().parent().find(
+                                "span.fileinput-filename ").text(
+                                value.substring(value.lastIndexOf("/") + 1));
+                        }
+                    } else if (ele.is('table')) {
+                        this._renderMultipleFiles(ele, name, value);
                     } else {
                         ele.val(value);
                     }
-                }
-            } else if (ele.is('select')) {
-                ele.val(value);
-            } else if (ele.is('textarea')) {
-                if (ele.attr("role") == "kindEditor") {
-                    ele.text(value);
+                } else if (ele.is('input[type="radio"]')) {
+                    this.$form.find(
+                        "input[type='radio'][name='" + name + "'][value='"
+                        + value + "']").attr("checked", true);
+                } else if (ele.is('input[type="checkbox"]')) {
                     if (value != null) {
-                        var editor = this._editor[ele.attr("id")];
-                        editor.html(value);
-                        editor.sync();
+                        var values = value.split(",");
+                        for (var i in values) {
+                            this.$form.find(
+                                "input[type='checkbox'][name='" + name
+                                + "'][value='" + values[i] + "']")
+                                .attr("checked", true);
+                        }
                     }
-                } else {
-                    if (value != null) {
+                } else if (ele.is('input[type="hidden"]')) {
+                    if (value != null && value != "") {
+                        if (ele.attr("data-type") == "tree-input") {
+                            if (isArray(value)) {
+                                value = value.toString();
+                            }
+                            ele.val(value);
+                            var tree = $.fn.zTree.getZTreeObj("tree_"
+                                + ele.attr("id"));
+                            if (tree !== undefined) {
+                                tree.refresh();
+                                tree.reAsyncChildNodes(null, "refresh");
+                            }
+                        } else if (ele.attr("role") == "image-input") {
+                            if (value !== undefined && value != '') {
+                                ele.val(value);
+                                var preview = ele.parent().parent().parent().find(
+                                    "[role='preview']");
+                                var $img = $('<img>');
+                                $img[0].src = value;
+                                if (preview.css('max-height') != 'none')
+                                    $img.css('max-height',
+                                        parseInt(preview.css('max-height'), 10)
+                                        - parseInt(preview
+                                            .css('padding-top'), 10)
+                                        - parseInt(preview
+                                            .css('padding-bottom'), 10)
+                                        - parseInt(preview
+                                            .css('border-top'), 10)
+                                        - parseInt(preview
+                                            .css('border-bottom'), 10))
+                                preview.html($img);
+                                preview.parent().removeClass("fileinput-new").addClass(
+                                    "fileinput-exists");
+                            }
+                        } else if (ele.attr("role") == "file-input") {
+                            ele.val(value);
+                            ele.parent().parent().parent().removeClass(
+                                "fileinput-new").addClass("fileinput-exists");
+                            ele.parent().parent().parent().find(
+                                "span.fileinput-filename ").text(
+                                value.substring(value.lastIndexOf("/") + 1));
+                        } else {
+                            ele.val(value);
+                        }
+                    }
+                } else if (ele.is('select')) {
+                    ele.val(value);
+                } else if (ele.is('textarea')) {
+                    if (ele.attr("role") == "kindEditor") {
                         ele.text(value);
+                        if (value != null) {
+                            var editor = this._editor[ele.attr("id")];
+                            editor.html(value);
+                            editor.sync();
+                        }
+                    } else {
+                        if (value != null) {
+                            ele.text(value);
+                        }
                     }
+                } else if (ele.is('p')) {
+                    var format = ele.data("format");
+                    if (format !== undefined)
+                        value = format(value);
+                    ele.html(value);
+                } else if (ele.is('table')) {
+                    this._renderMultipleFiles(ele, name, value);
+                } else if (ele.is('div[role=list]')) {
+                    this._renderDivList(ele, name, value);
+                } else {
+                    ele.val(value);
                 }
-            } else if (ele.is('p')) {
-                var format = ele.data("format");
-                if (format !== undefined)
-                    value = format(value);
-                ele.html(value);
-            } else if (ele.is('table')) {
-                this._renderMultipleFiles(ele, name, value);
-            } else if (ele.is('div[role=list]')) {
-                this._renderDivList(ele, name, value);
-            } else {
-                ele.val(value);
+                var loadHandler = ele.data("load");
+                if (loadHandler !== undefined) {
+                    loadHandler(ele, value);
+                }
+                this._uniform();
             }
-            var loadHandler = ele.data("load");
-            if (loadHandler !== undefined) {
-                loadHandler(ele, value);
-            }
-            this._uniform();
         },
         _reset: function () {
             var that = this;
             if (this._data !== undefined) {
                 $.each(this._data, function (i, value) {
-                    that._alue(i, value);
+                    that._loadValue(i, value);
                 });
             } else {
                 if (this.$form !== undefined)
@@ -1715,6 +1812,56 @@
                     });
                 }
             });
+        },
+        getJson: function () {
+            var that = this;
+            var json = {};
+            this.$form.find("div[drow=true]").each(function () {
+                $(this).children("div").each(function () {
+                    var item = $(this).data("data");
+                    if (item.type === 'list') {
+                        var $t = $(this);
+                        json[item.name] = [];
+                        $.each(item.items, function (i, d) {
+                            $t.find("[name=\"" + d.name + "\"]").each(function (ii, dd) {
+                                if (json[item.name][ii] === undefined) {
+                                    json[item.name][ii] = {};
+                                }
+                                if (d.textType === 'array') {
+                                    if ($(this).val() != "")
+                                        json[item.name][ii][d.name] = $(this).val().split(",");
+                                } else {
+                                    if ($(this).val() != "")
+                                        json[item.name][ii][d.name] = $(this).val();
+                                }
+                            });
+                        });
+                    } else {
+                        var nameArr = item.name.split(".");
+                        if (nameArr.length == 1) {
+                            if (item.textType === 'array') {
+                                if ($(this).find("[name='" + item.name + "']").val() != "")
+                                    json[item.name] = $(this).find("[name='" + item.name + "']").val().split(",");
+                            } else {
+                                if ($(this).find("[name='" + item.name + "']").val() != "")
+                                    json[item.name] = $(this).find("[name='" + item.name + "']").val();
+                            }
+                        } else if (nameArr.length == 2) {
+                            if (json[nameArr[0]] === undefined) {
+                                json[nameArr[0]] = {};
+                            }
+                            if (item.textType === 'array') {
+                                if ($(this).find("[name='" + item.name + "']").val() != "")
+                                    json[nameArr[0]][nameArr[1]] = $(this).find("[name='" + item.name + "']").val().split(",");
+                            } else {
+                                if ($(this).find("[name='" + item.name + "']").val() != "")
+                                    json[nameArr[0]][nameArr[1]] = $(this).find("[name='" + item.name + "']").val();
+                            }
+                        }
+                    }
+                });
+            });
+            return json;
         }
     };
 

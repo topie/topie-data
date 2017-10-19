@@ -465,7 +465,6 @@
                                     id: 'enabled',
                                     span: 2,
                                     label: '是否有效',
-                                    inline: true,
                                     items: [{
                                         value: true,
                                         text: '有效'

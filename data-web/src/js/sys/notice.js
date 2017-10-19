@@ -195,14 +195,15 @@
                                     type: 'select',
                                     name: 'type',
                                     id: 'type',
+                                    tips: '有啥区别呢？我也不知道！',
                                     label: '公告类型',
                                     items: [
                                         {
-                                            text: '社区公告',
+                                            text: '普通公告',
                                             value: 0
                                         },
                                         {
-                                            text: '物业公告',
+                                            text: '首页公告',
                                             value: 1
                                         }
                                     ],
@@ -414,13 +415,14 @@
                                     name: 'type',
                                     id: 'type',
                                     label: '公告类型',
+                                    tips: '有啥区别呢？我也不知道！',
                                     items: [
                                         {
-                                            text: '社区公告',
+                                            text: '公告类型1',
                                             value: 0
                                         },
                                         {
-                                            text: '物业公告',
+                                            text: '公告类型2',
                                             value: 1
                                         }
                                     ],

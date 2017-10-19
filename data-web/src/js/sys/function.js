@@ -28,7 +28,7 @@
                 request.setRequestHeader("X-Auth-Token", App.token);
             },
             contentType: "card",
-            contentTypeItems : "table,card,list",
+            contentTypeItems: "table,card,list",
             pageNum: 1,//当前页码
             pageSize: 15,//每页显示条数
             idField: "id",//id域指定
@@ -140,14 +140,15 @@
                             name: 'display',
                             id: 'display',
                             label: '是否显示',
-                            inline: true,
-                            items: [{
-                                value: true,
-                                text: '显示'
-                            }, {
-                                value: false,
-                                text: '隐藏'
-                            }],
+                            items: [
+                                {
+                                    value: true,
+                                    text: '显示'
+                                }, {
+                                    value: false,
+                                    text: '隐藏'
+                                }
+                            ],
                             rule: {
                                 required: true
                             },
@@ -282,7 +283,6 @@
                                 name: 'display',
                                 id: 'display',
                                 label: '是否显示',
-                                inline: true,
                                 items: [{
                                     value: true,
                                     text: '显示'
